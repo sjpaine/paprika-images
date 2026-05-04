@@ -88,7 +88,7 @@ async function scanFlow() {
   let base64 = imageToBase64(image)
 
   // Show single persistent loader — updated via JS, dismissed once at the end
-  showLoading("Scanning Text", "Reading text from photo\u2026")
+  await showLoading("Scanning Text", "Reading text from photo\u2026")
   let ocrResult = ocrImage(image)
 
   let responseText
@@ -729,7 +729,7 @@ async function saveAndShare(gzipBytes, name) {
 
 let _loaderWv = null
 
-function showLoading(title, subtitle) {
+async function showLoading(title, subtitle) {
   let html = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#f5f0e8;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:-apple-system,sans-serif;color:#1a1714}
@@ -745,7 +745,7 @@ p{font-size:14px;color:#8c8070;text-align:center;padding:0 32px}
   _loaderWv = new WebView()
   _loaderWv.loadHTML(html)
   _loaderWv.present(false)
-  return _loaderWv
+  try { await _loaderWv.evaluateJavaScript("document.readyState") } catch(e) {}
 }
 
 async function updateLoading(title, subtitle) {
