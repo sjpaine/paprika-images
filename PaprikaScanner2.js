@@ -87,37 +87,31 @@ async function scanFlow() {
   let sourceOverride = await getSourceInfo()
   let base64 = imageToBase64(image)
 
-  // Step 1: On-device OCR (instant, free, offline)
-  let loader = showLoading("Scanning Text", "Reading text from photo\u2026")
+  // Show single persistent loader — updated via JS, dismissed once at the end
+  showLoading("Scanning Text", "Reading text from photo\u2026")
   let ocrResult = ocrImage(image)
-  await hideLoading(loader)
 
-  // Step 2: Choose path based on OCR confidence
   let responseText
   if (ocrResult.confidence >= CONFIG.ocrConfidenceThreshold && ocrResult.text.length > 20) {
-    // Good OCR — use fast text-only LLM call
-    loader = showLoading("Analyzing Recipe", "This may take a minute or two\u2026")
+    await updateLoading("Analyzing Recipe", "This may take a minute or two\u2026")
     try {
       responseText = await callOpenRouterText(apiKey, ocrResult.text)
     } catch(apiErr) {
-      // Text LLM failed — try vision as fallback
-      await hideLoading(loader)
-      loader = showLoading("Retrying with Vision", "Text extraction failed, trying visual analysis\u2026")
+      await updateLoading("Retrying with Vision", "Text extraction failed, trying visual analysis\u2026")
       try {
         responseText = await callOpenRouterVision(apiKey, base64)
       } catch(visionErr) {
-        await hideLoading(loader)
+        await hideLoading()
         await showAlert("API Error", visionErr.message)
         return
       }
     }
   } else {
-    // Poor OCR — use vision model directly
-    loader = showLoading("Analyzing Recipe", "This may take a minute or two\u2026")
+    await updateLoading("Analyzing Recipe", "This may take a minute or two\u2026")
     try {
       responseText = await callOpenRouterVision(apiKey, base64)
     } catch(apiErr) {
-      await hideLoading(loader)
+      await hideLoading()
       await showAlert("API Error", apiErr.message)
       return
     }
@@ -127,12 +121,12 @@ async function scanFlow() {
   try {
     recipe = parseRecipe(responseText)
   } catch(parseErr) {
-    await hideLoading(loader)
+    await hideLoading()
     await showAlert("Parse Error", parseErr.message)
     return
   }
 
-  await hideLoading(loader)
+  await hideLoading()
 
   let confirmed = await showRecipePreview(recipe, sourceOverride, image)
   if (!confirmed) return
@@ -726,12 +720,14 @@ async function saveAndShare(gzipBytes, name) {
   let safeName = name.replace(/[^a-zA-Z0-9\s\-]/g, "").replace(/\s+/g, "_") || "recipe"
   let path = fm.joinPath(fm.temporaryDirectory(), safeName + ".paprikarecipe")
   fm.write(path, Data.fromBytes(gzipBytes))
-  Script.setOutput(path)
+  Script.setShortcutOutput(path)
   await ShareSheet.present([path])
   try { fm.remove(path) } catch(e) {}
 }
 
-// ── Loading Overlay (WebView spinner) ──
+// ── Loading Overlay (single persistent WebView) ──
+
+let _loaderWv = null
 
 function showLoading(title, subtitle) {
   let html = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>
@@ -743,18 +739,29 @@ h1{font-size:18px;font-weight:600;color:#7a4f2e;margin-bottom:8px}
 p{font-size:14px;color:#8c8070;text-align:center;padding:0 32px}
 </style></head><body>
 <div class="spinner"></div>
-<h1>${title}</h1>
-<p>${subtitle}</p>
+<h1 id="title">${title}</h1>
+<p id="subtitle">${subtitle}</p>
 </body></html>`
-  let wv = new WebView()
-  wv.loadHTML(html)
-  wv.present(false)
-  return wv
+  _loaderWv = new WebView()
+  _loaderWv.loadHTML(html)
+  _loaderWv.present(false)
+  return _loaderWv
 }
 
-async function hideLoading(wv) {
-  try { await wv.evaluateJavaScript("document.title") } catch(e) {}
-  try { await wv.dismiss() } catch(e) {}
+async function updateLoading(title, subtitle) {
+  if (!_loaderWv) return
+  let t = title.replace(/'/g, "\\'")
+  let s = subtitle.replace(/'/g, "\\'")
+  try {
+    await _loaderWv.evaluateJavaScript("document.getElementById('title').textContent='" + t + "';document.getElementById('subtitle').textContent='" + s + "'")
+  } catch(e) {}
+}
+
+async function hideLoading() {
+  if (!_loaderWv) return
+  try { await _loaderWv.evaluateJavaScript("document.title") } catch(e) {}
+  try { await _loaderWv.dismiss() } catch(e) {}
+  _loaderWv = null
 }
 
 // ── Alert Helper ──
