@@ -40,110 +40,97 @@ const C = {
   red: new Color("#a04040")
 }
 
-// ── Main Menu ──
+// ── Main Flow (Alert-based menu, loops after each scan) ──
 
-async function showMainMenu() {
-  let hasKey = Keychain.contains(CONFIG.keychainKey)
-  let action = null
+async function mainFlow() {
+  while (true) {
+    let hasKey = Keychain.contains(CONFIG.keychainKey)
 
-  let table = new UITable()
-  table.showSeparators = false
+    let menu = new Alert()
+    menu.title = "Recipe Scanner"
+    menu.message = "Photo \u2192 Paprika in seconds"
+    menu.addAction("Scan Recipe")
+    menu.addAction("API Key" + (hasKey ? " \u2705" : ""))
+    menu.addCancelAction("Done")
+    let choice = await menu.present()
 
-  // Header card
-  let headerRow = new UITableRow()
-  headerRow.height = 90
-  headerRow.backgroundColor = C.accent
-  let hCell = headerRow.addText("Recipe Scanner", "Photo \u2192 Paprika in seconds")
-  hCell.titleFont = Font.boldSystemFont(24)
-  hCell.titleColor = C.white
-  hCell.subtitleColor = new Color("#d4a87a")
-  hCell.subtitleFont = Font.systemFont(13)
-  hCell.widthWeight = 100
-  table.addRow(headerRow)
+    if (choice === 0) {
+      await scanFlow()
+    } else if (choice === 1) {
+      await configureApiKey()
+    } else {
+      break
+    }
+  }
+}
 
-  // Thin warm divider
-  let d1 = new UITableRow()
-  d1.height = 3
-  d1.backgroundColor = C.warm
-  d1.addText("")
-  table.addRow(d1)
+// ── Scan Flow (Alert-based until recipe is ready, then UITable preview) ──
 
-  // Scan row — dismissOnSelect so camera launches after table closes
-  let scanRow = new UITableRow()
-  scanRow.height = 70
-  scanRow.backgroundColor = C.white
-  let scanIcon = SFSymbol.named("doc.text.viewfinder")
-  scanIcon.applySemiboldWeight()
-  let scanIconCell = scanRow.addImage(scanIcon.image)
-  scanIconCell.widthWeight = 12
-  let scanCell = scanRow.addText("Scan a Recipe", "Take a photo or pick from your library")
-  scanCell.titleFont = Font.boldSystemFont(17)
-  scanCell.titleColor = C.accent
-  scanCell.subtitleFont = Font.systemFont(12)
-  scanCell.subtitleColor = C.muted
-  scanCell.widthWeight = 88
-  scanRow.dismissOnSelect = true
-  scanRow.onSelect = () => { action = "scan" }
-  table.addRow(scanRow)
+async function scanFlow() {
+  let apiKey = Keychain.contains(CONFIG.keychainKey) ? Keychain.get(CONFIG.keychainKey) : null
+  if (!apiKey) {
+    apiKey = await setupApiKey()
+    if (!apiKey) return
+  }
 
-  // Thin separator
-  let sep1 = new UITableRow()
-  sep1.height = 1
-  sep1.backgroundColor = C.faint
-  sep1.addText("")
-  table.addRow(sep1)
+  // Photo selection (Alert — no UITable presented)
+  let image = await selectImage()
+  if (!image) return
 
-  // API Key row
-  let keyRow = new UITableRow()
-  keyRow.height = 56
-  keyRow.backgroundColor = C.white
-  let keyStatus = hasKey ? "Configured \u2014 tap to change" : "Not set \u2014 tap to configure"
-  let keyIconName = hasKey ? "checkmark.circle.fill" : "key.fill"
-  let keyIcon = SFSymbol.named(keyIconName)
-  if (hasKey) keyIcon.applySemiboldWeight()
-  let keyIconCell = keyRow.addImage(keyIcon.image)
-  keyIconCell.widthWeight = 12
-  let keyCell = keyRow.addText("API Key", keyStatus)
-  keyCell.titleFont = Font.systemFont(15)
-  keyCell.titleColor = C.ink
-  keyCell.subtitleFont = Font.systemFont(12)
-  keyCell.subtitleColor = hasKey ? C.green : C.muted
-  keyCell.widthWeight = 88
-  keyRow.dismissOnSelect = true
-  keyRow.onSelect = () => { action = "key" }
-  table.addRow(keyRow)
+  // Source input (Alert — no UITable presented)
+  let sourceOverride = await getSourceInfo()
+  let base64 = imageToBase64(image)
 
-  // Thin separator
-  let sep2 = new UITableRow()
-  sep2.height = 1
-  sep2.backgroundColor = C.faint
-  sep2.addText("")
-  table.addRow(sep2)
+  // Progress notification while API processes
+  let progress = new Notification()
+  progress.title = "Analyzing Recipe"
+  progress.body = "Sending photo to vision model..."
+  progress.sound = "default"
+  progress.schedule()
 
-  // About row
-  let aboutRow = new UITableRow()
-  aboutRow.height = 56
-  aboutRow.backgroundColor = C.white
-  let aboutIcon = SFSymbol.named("info.circle")
-  aboutIcon.applyRegularWeight()
-  let aboutIconCell = aboutRow.addImage(aboutIcon.image)
-  aboutIconCell.widthWeight = 12
-  let aboutCell = aboutRow.addText("About", "Uses free OpenRouter vision models")
-  aboutCell.titleFont = Font.systemFont(15)
-  aboutCell.titleColor = C.ink
-  aboutCell.subtitleFont = Font.systemFont(12)
-  aboutCell.subtitleColor = C.muted
-  aboutCell.widthWeight = 88
-  aboutRow.dismissOnSelect = true
-  aboutRow.onSelect = () => { action = "about" }
-  table.addRow(aboutRow)
+  let responseText
+  try {
+    responseText = await callOpenRouter(apiKey, base64)
+  } catch(apiErr) {
+    let errNotif = new Notification()
+    errNotif.title = "Scan Failed"
+    errNotif.body = apiErr.message.substring(0, 100)
+    errNotif.sound = "default"
+    errNotif.schedule()
+    await showAlert("API Error", apiErr.message)
+    return
+  }
 
-  await table.present()
+  let recipe
+  try {
+    recipe = parseRecipe(responseText)
+  } catch(parseErr) {
+    await showAlert("Parse Error", parseErr.message)
+    return
+  }
 
-  // Run action after table is dismissed (camera/library picker needs this)
-  if (action === "scan") await scanFlow()
-  else if (action === "key") await configureApiKey()
-  else if (action === "about") await showAbout()
+  // Success notification
+  let success = new Notification()
+  success.title = "Recipe Found"
+  success.body = recipe.name
+  success.sound = "default"
+  success.schedule()
+
+  // Now show UITable preview (no more system pickers after this)
+  let confirmed = await showRecipePreview(recipe, sourceOverride, image)
+  if (!confirmed) return
+
+  let paprika = toPaprika(recipe, base64, sourceOverride)
+  let paprikaJson = JSON.stringify(paprika, Object.keys(paprika).sort())
+  let gzipped = gzip(paprikaJson)
+
+  await saveAndShare(gzipped, paprika.name)
+
+  let done = new Alert()
+  done.title = "Import Complete"
+  done.message = paprika.name + "\nOpen in Paprika to save this recipe."
+  done.addAction("OK")
+  await done.present()
 }
 
 // ── Section label helper ──
@@ -486,49 +473,6 @@ async function getSourceInfo() {
   return "p. " + page
 }
 
-// ── About ──
-
-async function showAbout() {
-  let table = new UITable()
-  table.showSeparators = false
-
-  let hRow = new UITableRow()
-  hRow.height = 80
-  hRow.backgroundColor = C.accent
-  let hc = hRow.addText("Recipe Scanner", "Photo \u2192 Paprika in seconds")
-  hc.titleFont = Font.boldSystemFont(22)
-  hc.titleColor = C.white
-  hc.subtitleColor = new Color("#d4a87a")
-  hc.subtitleFont = Font.systemFont(13)
-  hc.widthWeight = 100
-  table.addRow(hRow)
-
-  let dw = new UITableRow(); dw.height = 2; dw.backgroundColor = C.warm; dw.addText(""); table.addRow(dw)
-
-  let items = [
-    { label: "How it works", value: "Take a photo of a recipe. AI vision models extract the text, then a .paprikarecipe file is generated for import into Paprika." },
-    { label: "Models", value: "Tries free models in order with automatic fallback on rate limits: Nemotron, Gemma 3 12B, Gemma 3 4B, and more." },
-    { label: "Privacy", value: "Your API key is stored in iOS Keychain. Photos are sent to OpenRouter for processing. No data is stored on any server." },
-    { label: "Format", value: "Generates .paprikarecipe files (gzipped JSON) with SHA-256 hashes matching Paprika 3\u2019s native format." }
-  ]
-
-  for (let item of items) {
-    let row = new UITableRow()
-    row.backgroundColor = C.white
-    row.height = 72
-    let cell = row.addText(item.label, item.value)
-    cell.titleFont = Font.boldSystemFont(14)
-    cell.titleColor = C.accent
-    cell.subtitleFont = Font.systemFont(12)
-    cell.subtitleColor = C.muted
-    cell.widthWeight = 100
-    table.addRow(row)
-    let sep = new UITableRow(); sep.height = 1; sep.backgroundColor = C.faint; sep.addText(""); table.addRow(sep)
-  }
-
-  await table.present()
-}
-
 // ── OpenRouter Vision API ──
 
 const EXTRACT_PROMPT = `You are a recipe extraction assistant. Extract the recipe from this photo and return ONLY a JSON object with these exact fields:
@@ -736,4 +680,4 @@ async function showAlert(title, message) {
 
 // ── Entry Point ──
 
-showMainMenu()
+mainFlow()
