@@ -13,18 +13,18 @@
 const CONFIG = {
   openRouterUrl: "https://openrouter.ai/api/v1/chat/completions",
   visionModels: [
+    "google/gemma-4-31b-it:free",
+    "baidu/qianfan-ocr-fast:free",
     "nvidia/nemotron-nano-12b-v2-vl:free",
-    "google/gemma-3-12b-it:free",
-    "google/gemma-3-4b-it:free",
-    "google/gemma-3-27b-it:free",
-    "google/gemma-4-26b-a4b-it:free"
+    "google/gemma-4-26b-a4b-it:free",
+    "google/gemma-3-27b-it:free"
   ],
   textModels: [
-    "google/gemma-3-12b-it:free",
-    "google/gemma-3-4b-it:free",
-    "google/gemma-3-27b-it:free",
-    "google/gemma-4-26b-a4b-it:free",
-    "meta-llama/llama-4-scout:free"
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "qwen/qwen3-next-80b-a3b-instruct:free",
+    "inclusionai/ling-2.6-1t:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "google/gemma-4-31b-it:free"
   ],
   keychainKey: "openrouter_api_key",
   maxImageDimension: 1200,
@@ -90,7 +90,7 @@ async function scanFlow() {
   // Step 1: On-device OCR (instant, free, offline)
   let loader = showLoading("Scanning Text", "Reading text from photo\u2026")
   let ocrResult = ocrImage(image)
-  hideLoading(loader)
+  await hideLoading(loader)
 
   // Step 2: Choose path based on OCR confidence
   let responseText
@@ -101,12 +101,12 @@ async function scanFlow() {
       responseText = await callOpenRouterText(apiKey, ocrResult.text)
     } catch(apiErr) {
       // Text LLM failed — try vision as fallback
-      hideLoading(loader)
+      await hideLoading(loader)
       loader = showLoading("Retrying with Vision", "Text extraction failed, trying visual analysis\u2026")
       try {
         responseText = await callOpenRouterVision(apiKey, base64)
       } catch(visionErr) {
-        hideLoading(loader)
+        await hideLoading(loader)
         await showAlert("API Error", visionErr.message)
         return
       }
@@ -117,7 +117,7 @@ async function scanFlow() {
     try {
       responseText = await callOpenRouterVision(apiKey, base64)
     } catch(apiErr) {
-      hideLoading(loader)
+      await hideLoading(loader)
       await showAlert("API Error", apiErr.message)
       return
     }
@@ -127,12 +127,12 @@ async function scanFlow() {
   try {
     recipe = parseRecipe(responseText)
   } catch(parseErr) {
-    hideLoading(loader)
+    await hideLoading(loader)
     await showAlert("Parse Error", parseErr.message)
     return
   }
 
-  hideLoading(loader)
+  await hideLoading(loader)
 
   let confirmed = await showRecipePreview(recipe, sourceOverride, image)
   if (!confirmed) return
@@ -752,8 +752,9 @@ p{font-size:14px;color:#8c8070;text-align:center;padding:0 32px}
   return wv
 }
 
-function hideLoading(wv) {
-  try { wv.dismiss() } catch(e) {}
+async function hideLoading(wv) {
+  try { await wv.evaluateJavaScript("document.title") } catch(e) {}
+  try { await wv.dismiss() } catch(e) {}
 }
 
 // ── Alert Helper ──
