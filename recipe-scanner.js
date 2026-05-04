@@ -44,6 +44,8 @@ const C = {
 
 async function showMainMenu() {
   let hasKey = Keychain.contains(CONFIG.keychainKey)
+  let action = null
+
   let table = new UITable()
   table.showSeparators = false
 
@@ -66,7 +68,7 @@ async function showMainMenu() {
   d1.addText("")
   table.addRow(d1)
 
-  // Scan row
+  // Scan row — dismissOnSelect so camera launches after table closes
   let scanRow = new UITableRow()
   scanRow.height = 70
   scanRow.backgroundColor = C.white
@@ -80,7 +82,8 @@ async function showMainMenu() {
   scanCell.subtitleFont = Font.systemFont(12)
   scanCell.subtitleColor = C.muted
   scanCell.widthWeight = 88
-  scanRow.onSelect = async () => { await scanFlow() }
+  scanRow.dismissOnSelect = true
+  scanRow.onSelect = () => { action = "scan" }
   table.addRow(scanRow)
 
   // Thin separator
@@ -106,7 +109,8 @@ async function showMainMenu() {
   keyCell.subtitleFont = Font.systemFont(12)
   keyCell.subtitleColor = hasKey ? C.green : C.muted
   keyCell.widthWeight = 88
-  keyRow.onSelect = async () => { await configureApiKey() }
+  keyRow.dismissOnSelect = true
+  keyRow.onSelect = () => { action = "key" }
   table.addRow(keyRow)
 
   // Thin separator
@@ -130,10 +134,16 @@ async function showMainMenu() {
   aboutCell.subtitleFont = Font.systemFont(12)
   aboutCell.subtitleColor = C.muted
   aboutCell.widthWeight = 88
-  aboutRow.onSelect = async () => { await showAbout() }
+  aboutRow.dismissOnSelect = true
+  aboutRow.onSelect = () => { action = "about" }
   table.addRow(aboutRow)
 
   await table.present()
+
+  // Run action after table is dismissed (camera/library picker needs this)
+  if (action === "scan") await scanFlow()
+  else if (action === "key") await configureApiKey()
+  else if (action === "about") await showAbout()
 }
 
 // ── Section label helper ──
