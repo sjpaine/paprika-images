@@ -7,8 +7,7 @@
 // 1. Install Scriptable from the App Store
 // 2. Add this script to Scriptable
 // 3. Get a free API key at openrouter.ai
-// 4. Run the script — it auto-detects your API key from clipboard
-//    (copy on Mac, Universal Clipboard syncs to iPhone) or enter manually
+// 4. Run the script — auto-detects API key from clipboard
 // 5. Pick a recipe photo → enter cookbook/page → confirm → open in Paprika!
 
 const CONFIG = {
@@ -24,20 +23,21 @@ const CONFIG = {
   maxImageDimension: 1200
 }
 
-// ── Colors ──
+// ── Design tokens (Shapecast-inspired warm craft palette) ──
 
 const C = {
-  accent: new Color("#E85D3A"),
-  green: new Color("#34C759"),
-  orange: new Color("#FF9500"),
-  red: new Color("#FF3B30"),
-  blue: new Color("#007AFF"),
-  gray: new Color("#8E8E93"),
-  lightGray: new Color("#E5E5EA"),
-  darkText: new Color("#1C1C1E"),
-  secondaryText: new Color("#636366"),
-  bg: new Color("#F2F2F7"),
-  white: Color.white()
+  ink: new Color("#1a1714"),
+  paper: new Color("#f5f0e8"),
+  warm: new Color("#c8a96e"),
+  faint: new Color("#e8e0d0"),
+  muted: new Color("#8c8070"),
+  accent: new Color("#7a4f2e"),
+  white: new Color("#ffffff"),
+  cream: new Color("#faf7f0"),
+  sectionBg: new Color("#f0ebe0"),
+  dividerDark: new Color("#d4c9b8"),
+  green: new Color("#5a7a4a"),
+  red: new Color("#a04040")
 }
 
 // ── Main Menu ──
@@ -47,57 +47,107 @@ async function showMainMenu() {
   let table = new UITable()
   table.showSeparators = false
 
+  // Header card
   let headerRow = new UITableRow()
-  headerRow.height = 80
+  headerRow.height = 90
   headerRow.backgroundColor = C.accent
-  let headerCell = headerRow.addText("Recipe Scanner", "Photo → Paprika in seconds")
-  headerCell.titleFont = Font.boldSystemFont(22)
-  headerCell.titleColor = C.white
-  headerCell.subtitleColor = new Color("#FFCCC4")
-  headerCell.subtitleFont = Font.systemFont(14)
+  let hCell = headerRow.addText("Recipe Scanner", "Photo \u2192 Paprika in seconds")
+  hCell.titleFont = Font.boldSystemFont(24)
+  hCell.titleColor = C.white
+  hCell.subtitleColor = new Color("#d4a87a")
+  hCell.subtitleFont = Font.systemFont(13)
+  hCell.widthWeight = 100
   table.addRow(headerRow)
 
+  // Thin warm divider
+  let d1 = new UITableRow()
+  d1.height = 3
+  d1.backgroundColor = C.warm
+  d1.addText("")
+  table.addRow(d1)
+
+  // Scan row
   let scanRow = new UITableRow()
-  scanRow.height = 66
+  scanRow.height = 70
   scanRow.backgroundColor = C.white
-  let scanCell = scanRow.addText("Scan Recipe", "Take a photo or pick from library")
+  let scanIcon = SFSymbol.named("doc.text.viewfinder")
+  scanIcon.applySemiboldWeight()
+  let scanIconCell = scanRow.addImage(scanIcon.image)
+  scanIconCell.widthWeight = 12
+  let scanCell = scanRow.addText("Scan a Recipe", "Take a photo or pick from your library")
   scanCell.titleFont = Font.boldSystemFont(17)
   scanCell.titleColor = C.accent
-  scanCell.subtitleFont = Font.systemFont(13)
-  scanCell.subtitleColor = C.secondaryText
-  let scanIcon = scanRow.addImage(SFSymbol.named("camera.fill").image)
-  scanIcon.widthWeight = 15
+  scanCell.subtitleFont = Font.systemFont(12)
+  scanCell.subtitleColor = C.muted
+  scanCell.widthWeight = 88
   scanRow.onSelect = async () => { await scanFlow() }
   table.addRow(scanRow)
 
+  // Thin separator
+  let sep1 = new UITableRow()
+  sep1.height = 1
+  sep1.backgroundColor = C.faint
+  sep1.addText("")
+  table.addRow(sep1)
+
+  // API Key row
   let keyRow = new UITableRow()
-  keyRow.height = 50
+  keyRow.height = 56
   keyRow.backgroundColor = C.white
-  let keyIcon = hasKey ? SFSymbol.named("checkmark.circle.fill").image : SFSymbol.named("key.fill").image
-  let keyCell = keyRow.addText("API Key", hasKey ? "Configured — tap to change" : "Not set — tap to configure")
+  let keyStatus = hasKey ? "Configured \u2014 tap to change" : "Not set \u2014 tap to configure"
+  let keyIconName = hasKey ? "checkmark.circle.fill" : "key.fill"
+  let keyIcon = SFSymbol.named(keyIconName)
+  if (hasKey) keyIcon.applySemiboldWeight()
+  let keyIconCell = keyRow.addImage(keyIcon.image)
+  keyIconCell.widthWeight = 12
+  let keyCell = keyRow.addText("API Key", keyStatus)
   keyCell.titleFont = Font.systemFont(15)
-  keyCell.titleColor = C.darkText
+  keyCell.titleColor = C.ink
   keyCell.subtitleFont = Font.systemFont(12)
-  keyCell.subtitleColor = hasKey ? C.green : C.gray
-  let keyImg = keyRow.addImage(keyIcon)
-  keyImg.widthWeight = 15
+  keyCell.subtitleColor = hasKey ? C.green : C.muted
+  keyCell.widthWeight = 88
   keyRow.onSelect = async () => { await configureApiKey() }
   table.addRow(keyRow)
 
-  let infoRow = new UITableRow()
-  infoRow.height = 50
-  infoRow.backgroundColor = C.white
-  let infoCell = infoRow.addText("About", "Uses free OpenRouter vision models")
-  infoCell.titleFont = Font.systemFont(15)
-  infoCell.titleColor = C.darkText
-  infoCell.subtitleFont = Font.systemFont(12)
-  infoCell.subtitleColor = C.secondaryText
-  let infoImg = infoRow.addImage(SFSymbol.named("info.circle.fill").image)
-  infoImg.widthWeight = 15
-  infoRow.onSelect = async () => { await showAbout() }
-  table.addRow(infoRow)
+  // Thin separator
+  let sep2 = new UITableRow()
+  sep2.height = 1
+  sep2.backgroundColor = C.faint
+  sep2.addText("")
+  table.addRow(sep2)
+
+  // About row
+  let aboutRow = new UITableRow()
+  aboutRow.height = 56
+  aboutRow.backgroundColor = C.white
+  let aboutIcon = SFSymbol.named("info.circle")
+  aboutIcon.applyRegularWeight()
+  let aboutIconCell = aboutRow.addImage(aboutIcon.image)
+  aboutIconCell.widthWeight = 12
+  let aboutCell = aboutRow.addText("About", "Uses free OpenRouter vision models")
+  aboutCell.titleFont = Font.systemFont(15)
+  aboutCell.titleColor = C.ink
+  aboutCell.subtitleFont = Font.systemFont(12)
+  aboutCell.subtitleColor = C.muted
+  aboutCell.widthWeight = 88
+  aboutRow.onSelect = async () => { await showAbout() }
+  table.addRow(aboutRow)
 
   await table.present()
+}
+
+// ── Section label helper ──
+
+function addSectionLabel(table, text) {
+  let row = new UITableRow()
+  row.height = 32
+  row.backgroundColor = C.sectionBg
+  let cell = row.addText(text.toUpperCase())
+  cell.titleFont = Font.boldSystemFont(11)
+  cell.titleColor = C.muted
+  cell.widthWeight = 100
+  cell.leftAligned()
+  table.addRow(row)
 }
 
 // ── Scan Flow ──
@@ -113,7 +163,6 @@ async function scanFlow() {
   if (!image) return
 
   let sourceOverride = await getSourceInfo()
-
   let base64 = imageToBase64(image)
 
   let responseText
@@ -142,85 +191,96 @@ async function scanFlow() {
   await saveAndShare(gzipped, paprika.name)
 
   let done = new Alert()
-  done.title = "Done!"
-  done.message = paprika.name + " has been shared.\nOpen it in Paprika to import."
-  done.addAction("OK")
+  done.title = "Import Complete"
+  done.message = paprika.name + "\nOpen in Paprika to save this recipe."
+  done.addAction("Done")
   await done.present()
 }
 
-// ── Recipe Preview ──
+// ── Recipe Preview (Shapecast-inspired card layout) ──
 
 async function showRecipePreview(recipe, sourceOverride, image) {
   return new Promise(function(resolve) {
     let table = new UITable()
-    table.showSeparators = true
-
+    table.showSeparators = false
     let finalSource = sourceOverride || recipe.source || ""
 
-    // Header with image
+    // Hero header
     if (image) {
       let imgRow = new UITableRow()
-      imgRow.height = 180
-      imgRow.backgroundColor = C.white
+      imgRow.height = 200
+      imgRow.backgroundColor = C.paper
       let imgCell = imgRow.addImage(image)
       imgCell.widthWeight = 100
       table.addRow(imgRow)
     }
 
-    // Name and description
+    // Title card
     let nameRow = new UITableRow()
-    nameRow.height = 60
+    nameRow.height = 64
     nameRow.backgroundColor = C.white
-    let desc = recipe.description || ""
-    let nameCell = nameRow.addText(recipe.name || "Untitled Recipe", desc)
-    nameCell.titleFont = Font.boldSystemFont(18)
-    nameCell.titleColor = C.darkText
+    let nameCell = nameRow.addText(recipe.name || "Untitled Recipe", recipe.description || "")
+    nameCell.titleFont = Font.boldSystemFont(20)
+    nameCell.titleColor = C.accent
     nameCell.subtitleFont = Font.systemFont(13)
-    nameCell.subtitleColor = C.secondaryText
-    nameCell.widthWeight = 80
+    nameCell.subtitleColor = C.muted
+    nameCell.widthWeight = 100
     table.addRow(nameRow)
 
-    // Details section
-    let times = []
-    if (recipe.servings) times.push({ label: "Servings", value: recipe.servings })
-    if (recipe.prep_time) times.push({ label: "Prep", value: recipe.prep_time })
-    if (recipe.cook_time) times.push({ label: "Cook", value: recipe.cook_time })
-    if (recipe.total_time) times.push({ label: "Total", value: recipe.total_time })
-    if (finalSource) times.push({ label: "Source", value: finalSource })
+    // Warm divider
+    let dw = new UITableRow()
+    dw.height = 2
+    dw.backgroundColor = C.warm
+    dw.addText("")
+    table.addRow(dw)
 
-    if (times.length > 0) {
-      for (let t of times) {
-        let row = new UITableRow()
-        row.backgroundColor = C.white
-        let labelCell = row.addText(t.label)
-        labelCell.titleFont = Font.boldSystemFont(13)
-        labelCell.titleColor = C.secondaryText
-        labelCell.widthWeight = 30
-        let valueCell = row.addText(t.value)
-        valueCell.titleFont = Font.systemFont(13)
-        valueCell.titleColor = C.darkText
-        valueCell.widthWeight = 70
-        table.addRow(row)
-      }
+    // Details
+    addSectionLabel(table, "Details")
+    let details = []
+    if (recipe.servings) details.push(["Servings", recipe.servings])
+    if (recipe.prep_time) details.push(["Prep", recipe.prep_time])
+    if (recipe.cook_time) details.push(["Cook", recipe.cook_time])
+    if (recipe.total_time) details.push(["Total", recipe.total_time])
+    if (finalSource) details.push(["Source", finalSource])
+    for (let d of details) {
+      let row = new UITableRow()
+      row.backgroundColor = C.white
+      row.height = 36
+      let labelCell = row.addText(d[0])
+      labelCell.titleFont = Font.systemFont(13)
+      labelCell.titleColor = C.muted
+      labelCell.widthWeight = 30
+      labelCell.leftAligned()
+      let valCell = row.addText(d[1])
+      valCell.titleFont = Font.mediumSystemFont(13)
+      valCell.titleColor = C.ink
+      valCell.widthWeight = 70
+      table.addRow(row)
     }
 
     // Ingredients
     let ingredients = (recipe.ingredients || "").replace(/\\n/g, "\n").split("\n").filter(function(l) { return l.trim() })
     if (ingredients.length > 0) {
-      let headerRow = new UITableRow()
-      headerRow.isHeader = true
-      headerRow.addText("INGREDIENTS")
-      table.addRow(headerRow)
+      let id = new UITableRow()
+      id.height = 2
+      id.backgroundColor = C.faint
+      id.addText("")
+      table.addRow(id)
 
+      addSectionLabel(table, "Ingredients \u00b7 " + ingredients.length)
       for (let ing of ingredients) {
         let row = new UITableRow()
-        row.backgroundColor = C.white
-        let dot = row.addImage(SFSymbol.named("circle.fill").image)
-        dot.widthWeight = 8
+        row.backgroundColor = C.cream
+        row.height = 32
+        let bulletCell = row.addText("\u2022")
+        bulletCell.titleFont = Font.systemFont(12)
+        bulletCell.titleColor = C.warm
+        bulletCell.widthWeight = 6
+        bulletCell.leftAligned()
         let cell = row.addText(ing.trim())
         cell.titleFont = Font.systemFont(14)
-        cell.titleColor = C.darkText
-        cell.widthWeight = 92
+        cell.titleColor = C.ink
+        cell.widthWeight = 94
         table.addRow(row)
       }
     }
@@ -228,22 +288,26 @@ async function showRecipePreview(recipe, sourceOverride, image) {
     // Directions
     let directions = (recipe.directions || "").replace(/\\n/g, "\n").split("\n").filter(function(l) { return l.trim() })
     if (directions.length > 0) {
-      let dirHeader = new UITableRow()
-      dirHeader.isHeader = true
-      dirHeader.addText("DIRECTIONS")
-      table.addRow(dirHeader)
+      let dd = new UITableRow()
+      dd.height = 2
+      dd.backgroundColor = C.faint
+      dd.addText("")
+      table.addRow(dd)
 
+      addSectionLabel(table, "Directions")
       for (let i = 0; i < directions.length; i++) {
         let row = new UITableRow()
         row.backgroundColor = C.white
+        row.height = 36
         let numCell = row.addText(String(i + 1))
         numCell.titleFont = Font.boldSystemFont(14)
         numCell.titleColor = C.accent
-        numCell.widthWeight = 10
+        numCell.widthWeight = 8
+        numCell.leftAligned()
         let stepCell = row.addText(directions[i].trim())
         stepCell.titleFont = Font.systemFont(14)
-        stepCell.titleColor = C.darkText
-        stepCell.widthWeight = 90
+        stepCell.titleColor = C.ink
+        stepCell.widthWeight = 92
         table.addRow(row)
       }
     }
@@ -251,39 +315,50 @@ async function showRecipePreview(recipe, sourceOverride, image) {
     // Notes
     let notes = (recipe.notes || "").replace(/\\n/g, "\n").trim()
     if (notes) {
-      let notesHeader = new UITableRow()
-      notesHeader.isHeader = true
-      notesHeader.addText("NOTES")
-      table.addRow(notesHeader)
+      let nd = new UITableRow()
+      nd.height = 2
+      nd.backgroundColor = C.faint
+      nd.addText("")
+      table.addRow(nd)
 
+      addSectionLabel(table, "Notes")
       let notesRow = new UITableRow()
-      notesRow.backgroundColor = C.white
+      notesRow.backgroundColor = C.cream
       let notesCell = notesRow.addText(notes)
       notesCell.titleFont = Font.systemFont(13)
-      notesCell.titleColor = C.secondaryText
+      notesCell.titleColor = C.muted
       notesCell.widthWeight = 100
       table.addRow(notesRow)
     }
 
-    // Buttons
+    // Create button
+    let spacerRow = new UITableRow()
+    spacerRow.height = 16
+    spacerRow.backgroundColor = C.paper
+    spacerRow.addText("")
+    table.addRow(spacerRow)
+
     let createRow = new UITableRow()
-    createRow.height = 54
+    createRow.height = 52
     createRow.backgroundColor = C.accent
     let createCell = createRow.addText("Create Paprika File")
     createCell.titleFont = Font.boldSystemFont(18)
     createCell.titleColor = C.white
     createCell.widthWeight = 100
+    createCell.centerAligned()
     createRow.onSelect = function() { resolve(true) }
     createRow.dismissOnSelect = true
     table.addRow(createRow)
 
+    // Cancel
     let cancelRow = new UITableRow()
     cancelRow.height = 44
-    cancelRow.backgroundColor = C.white
+    cancelRow.backgroundColor = C.paper
     let cancelCell = cancelRow.addText("Cancel")
-    cancelCell.titleFont = Font.systemFont(16)
-    cancelCell.titleColor = C.red
+    cancelCell.titleFont = Font.systemFont(15)
+    cancelCell.titleColor = C.muted
     cancelCell.widthWeight = 100
+    cancelCell.centerAligned()
     cancelRow.onSelect = function() { resolve(false) }
     cancelRow.dismissOnSelect = true
     table.addRow(cancelRow)
@@ -297,8 +372,8 @@ async function showRecipePreview(recipe, sourceOverride, image) {
 async function configureApiKey() {
   let currentKey = Keychain.contains(CONFIG.keychainKey) ? Keychain.get(CONFIG.keychainKey) : ""
   let alert = new Alert()
-  alert.title = "OpenRouter API Key"
-  alert.message = currentKey ? "Current key: " + currentKey.substring(0, 14) + "...\n\nEnter a new key to replace it, or clear to remove." : "Enter your OpenRouter API key.\n\nGet one free at openrouter.ai"
+  alert.title = "API Key"
+  alert.message = currentKey ? "Current: " + currentKey.substring(0, 14) + "..." : "Enter your OpenRouter API key.\nGet one free at openrouter.ai"
   alert.addTextField(currentKey ? currentKey : "sk-or-v1-...")
   alert.addAction("Save")
   alert.addAction("Clear")
@@ -310,17 +385,15 @@ async function configureApiKey() {
       Keychain.set(CONFIG.keychainKey, key)
       await showAlert("Saved", "API key saved to Keychain.")
     } else if (key) {
-      await showAlert("Invalid Key", "Key should start with 'sk-'. Please check and try again.")
+      await showAlert("Invalid Key", "Key should start with 'sk-'.")
     }
   } else if (choice === 1) {
     if (Keychain.contains(CONFIG.keychainKey)) {
       Keychain.remove(CONFIG.keychainKey)
-      await showAlert("Cleared", "API key removed from Keychain.")
+      await showAlert("Cleared", "API key removed.")
     }
   }
 }
-
-// ── API Key Setup (first-time) ──
 
 async function setupApiKey() {
   let clip = ""
@@ -340,8 +413,8 @@ async function setupApiKey() {
   }
 
   let alert = new Alert()
-  alert.title = "OpenRouter API Key"
-  alert.message = "Enter your OpenRouter API key.\n\nGet one free at openrouter.ai\n\nTip: Copy the key on your Mac — it will auto-detect from clipboard."
+  alert.title = "API Key"
+  alert.message = "Enter your OpenRouter API key.\n\nGet one free at openrouter.ai\n\nTip: Copy the key on your Mac \u2014 it will auto-detect from clipboard."
   alert.addTextField("sk-or-v1-...")
   alert.addAction("Save")
   alert.addCancelAction("Cancel")
@@ -365,25 +438,16 @@ async function selectImage() {
   if (choice === -1) return null
   try {
     let img = choice === 0 ? await Photos.fromLibrary() : await Photos.fromCamera()
-    if (!img) {
-      await showAlert("No Image", "No image was selected.")
-      return null
-    }
+    if (!img) { await showAlert("No Image", "No image was selected."); return null }
     return img
-  } catch(e) {
-    await showAlert("Image Error", "Could not select image: " + e.message)
-    return null
-  }
+  } catch(e) { await showAlert("Error", "Could not select image: " + e.message); return null }
 }
 
 function imageToBase64(image) {
   let maxDim = CONFIG.maxImageDimension
-  let w = image.size.width
-  let h = image.size.height
+  let w = image.size.width, h = image.size.height
   let scale = Math.min(1, maxDim / Math.max(w, h))
-  let newW = Math.round(w * scale)
-  let newH = Math.round(h * scale)
-
+  let newW = Math.round(w * scale), newH = Math.round(h * scale)
   let ctx = new DrawContext()
   ctx.size = new Size(newW, newH)
   ctx.drawImageInRect(image, new Rect(0, 0, newW, newH))
@@ -397,7 +461,7 @@ function imageToBase64(image) {
 async function getSourceInfo() {
   let alert = new Alert()
   alert.title = "Recipe Source"
-  alert.message = "Optional: enter the cookbook name and page number.\nThis will be saved as the recipe source in Paprika."
+  alert.message = "Optional: cookbook name and page number.\nThis becomes the source field in Paprika."
   alert.addTextField("Cookbook name")
   alert.addTextField("Page number")
   alert.addAction("Continue")
@@ -407,7 +471,7 @@ async function getSourceInfo() {
   let cookbook = alert.textFieldValue(0).trim()
   let page = alert.textFieldValue(1).trim()
   if (!cookbook && !page) return null
-  if (cookbook && page) return cookbook + " - p. " + page
+  if (cookbook && page) return cookbook + " \u2014 p." + page
   if (cookbook) return cookbook
   return "p. " + page
 }
@@ -416,35 +480,40 @@ async function getSourceInfo() {
 
 async function showAbout() {
   let table = new UITable()
-  table.showSeparators = true
+  table.showSeparators = false
 
-  let headerRow = new UITableRow()
-  headerRow.height = 70
-  headerRow.backgroundColor = C.accent
-  let hCell = headerRow.addText("Recipe Scanner", "Photo → Paprika in seconds")
-  hCell.titleFont = Font.boldSystemFont(20)
-  hCell.titleColor = C.white
-  hCell.subtitleColor = new Color("#FFCCC4")
-  hCell.subtitleFont = Font.systemFont(13)
-  table.addRow(headerRow)
+  let hRow = new UITableRow()
+  hRow.height = 80
+  hRow.backgroundColor = C.accent
+  let hc = hRow.addText("Recipe Scanner", "Photo \u2192 Paprika in seconds")
+  hc.titleFont = Font.boldSystemFont(22)
+  hc.titleColor = C.white
+  hc.subtitleColor = new Color("#d4a87a")
+  hc.subtitleFont = Font.systemFont(13)
+  hc.widthWeight = 100
+  table.addRow(hRow)
 
-  let aboutItems = [
-    { label: "How it works", value: "Take a photo of a recipe, and this script uses AI vision models (via OpenRouter) to extract the recipe text. It then generates a .paprikarecipe file you can open directly in Paprika." },
-    { label: "Models", value: "Tries free models in order: nvidia/nemotron-nano-12b-v2-vl:free, google/gemma-3-12b-it:free, and more. Automatically falls back on rate limits." },
+  let dw = new UITableRow(); dw.height = 2; dw.backgroundColor = C.warm; dw.addText(""); table.addRow(dw)
+
+  let items = [
+    { label: "How it works", value: "Take a photo of a recipe. AI vision models extract the text, then a .paprikarecipe file is generated for import into Paprika." },
+    { label: "Models", value: "Tries free models in order with automatic fallback on rate limits: Nemotron, Gemma 3 12B, Gemma 3 4B, and more." },
     { label: "Privacy", value: "Your API key is stored in iOS Keychain. Photos are sent to OpenRouter for processing. No data is stored on any server." },
-    { label: "Format", value: "Generates .paprikarecipe files (gzipped JSON) matching Paprika 3's native import format with SHA-256 hashes." }
+    { label: "Format", value: "Generates .paprikarecipe files (gzipped JSON) with SHA-256 hashes matching Paprika 3\u2019s native format." }
   ]
 
-  for (let item of aboutItems) {
+  for (let item of items) {
     let row = new UITableRow()
     row.backgroundColor = C.white
+    row.height = 72
     let cell = row.addText(item.label, item.value)
     cell.titleFont = Font.boldSystemFont(14)
-    cell.titleColor = C.darkText
+    cell.titleColor = C.accent
     cell.subtitleFont = Font.systemFont(12)
-    cell.subtitleColor = C.secondaryText
+    cell.subtitleColor = C.muted
     cell.widthWeight = 100
     table.addRow(row)
+    let sep = new UITableRow(); sep.height = 1; sep.backgroundColor = C.faint; sep.addText(""); table.addRow(sep)
   }
 
   await table.present()
@@ -480,17 +549,11 @@ function sleep(ms) {
 
 async function callOpenRouter(apiKey, base64Image) {
   let lastError = null
-
   for (let i = 0; i < CONFIG.models.length; i++) {
     let model = CONFIG.models[i]
-    log("Trying model " + (i + 1) + "/" + CONFIG.models.length + ": " + model)
-
+    log("Trying " + model)
     for (let attempt = 0; attempt < 2; attempt++) {
-      if (attempt > 0) {
-        log("Retry " + attempt + " after 10s wait...")
-        await sleep(10000)
-      }
-
+      if (attempt > 0) { log("Retry after 10s..."); await sleep(10000) }
       let req = new Request(CONFIG.openRouterUrl)
       req.method = "POST"
       req.headers = {
@@ -500,8 +563,7 @@ async function callOpenRouter(apiKey, base64Image) {
         "X-OpenRouter-Title": "Paprika Recipe Scanner"
       }
       req.timeoutInterval = 120
-
-      let body = JSON.stringify({
+      req.body = JSON.stringify({
         model: model,
         messages: [{
           role: "user",
@@ -511,48 +573,24 @@ async function callOpenRouter(apiKey, base64Image) {
           ]
         }]
       })
-      req.body = body
-
       let response
-      try {
-        response = await req.loadJSON()
-      } catch(e) {
-        log("Request failed: " + e.message)
-        lastError = new Error("Network error: " + e.message)
-        continue
-      }
-
+      try { response = await req.loadJSON() } catch(e) { lastError = new Error("Network error: " + e.message); continue }
       let status = req.response.statusCode
-
-      if (status === 429) {
-        log("Rate limited on " + model)
-        if (attempt === 0) continue
-        lastError = new Error("Rate limited on " + model + ". Trying next model...")
-        break
-      }
-
+      if (status === 429) { if (attempt === 0) continue; lastError = new Error("Rate limited on " + model); break }
       if (status !== 200) {
-        let msg = "Unknown error"
-        if (response.error) msg = response.error.message || JSON.stringify(response.error)
-        else msg = JSON.stringify(response).substring(0, 200)
-        log("Error from " + model + ": " + msg)
+        let msg = response.error ? (response.error.message || JSON.stringify(response.error)) : JSON.stringify(response).substring(0, 200)
         lastError = new Error("API error (" + status + "): " + msg)
         if (status >= 400 && status < 500 && status !== 429) break
         continue
       }
-
       if (!response.choices || !response.choices[0] || !response.choices[0].message || !response.choices[0].message.content) {
-        log("Empty response from " + model)
-        lastError = new Error("Empty response from " + model)
-        break
+        lastError = new Error("Empty response from " + model); break
       }
-
       log("Success with " + model)
       return response.choices[0].message.content
     }
   }
-
-  throw lastError || new Error("All models failed. Please try again later.")
+  throw lastError || new Error("All models failed. Try again later.")
 }
 
 // ── Recipe Parsing ──
@@ -570,69 +608,28 @@ function parseRecipe(text) {
 
 // ── SHA-256 ──
 
-var sha256K = [
-  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
-  0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
-  0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
-  0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
-  0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc,
-  0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
-  0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
-  0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
-  0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
-  0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
-  0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3,
-  0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
-  0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5,
-  0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-  0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
-  0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
-]
+var sha256K = [0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]
 
 function sha256Hex(str) {
   if (typeof str === "string") {
-    var encoded = []
+    var e = []
     for (var i = 0; i < str.length; i++) {
       var c = str.charCodeAt(i)
-      if (c < 0x80) encoded.push(c)
-      else if (c < 0x800) { encoded.push(0xC0|(c>>6)); encoded.push(0x80|(c&0x3F)) }
-      else if (c >= 0xD800 && c <= 0xDBFF) {
-        var hi = c, lo = str.charCodeAt(++i)
-        var cp = ((hi - 0xD800) << 10) + (lo - 0xDC00) + 0x10000
-        encoded.push(0xF0|(cp>>18)); encoded.push(0x80|((cp>>12)&0x3F))
-        encoded.push(0x80|((cp>>6)&0x3F)); encoded.push(0x80|(cp&0x3F))
-      } else { encoded.push(0xE0|(c>>12)); encoded.push(0x80|((c>>6)&0x3F)); encoded.push(0x80|(c&0x3F)) }
+      if (c < 0x80) e.push(c)
+      else if (c < 0x800) { e.push(0xC0|(c>>6)); e.push(0x80|(c&0x3F)) }
+      else if (c >= 0xD800 && c <= 0xDBFF) { var lo = str.charCodeAt(++i); var cp = ((c-0xD800)<<10)+(lo-0xDC00)+0x10000; e.push(0xF0|(cp>>18)); e.push(0x80|((cp>>12)&0x3F)); e.push(0x80|((cp>>6)&0x3F)); e.push(0x80|(cp&0x3F)) }
+      else { e.push(0xE0|(c>>12)); e.push(0x80|((c>>6)&0x3F)); e.push(0x80|(c&0x3F)) }
     }
-    str = encoded
+    str = e
   }
-  var h0 = 0x6a09e667, h1 = 0xbb67ae85, h2 = 0x3c6ef372, h3 = 0xa54ff53a
-  var h4 = 0x510e527f, h5 = 0x9b05688c, h6 = 0x1f83d9ab, h7 = 0x5be0cd19
-  var msgLen = str.length, bitLen = msgLen * 8
-  str.push(0x80)
-  while (str.length % 64 !== 56) str.push(0)
-  str.push(0, 0, 0, 0)
-  str.push((bitLen >>> 24) & 0xFF, (bitLen >>> 16) & 0xFF, (bitLen >>> 8) & 0xFF, bitLen & 0xFF)
-  for (var offset = 0; offset < str.length; offset += 64) {
-    var w = new Array(64)
-    for (var i = 0; i < 16; i++) { var j = offset + i * 4; w[i] = (str[j] << 24) | (str[j+1] << 16) | (str[j+2] << 8) | str[j+3] }
-    for (var i = 16; i < 64; i++) {
-      var s0 = ((w[i-15] >>> 7) | (w[i-15] << 25)) ^ ((w[i-15] >>> 18) | (w[i-15] << 14)) ^ (w[i-15] >>> 3)
-      var s1 = ((w[i-2] >>> 17) | (w[i-2] << 15)) ^ ((w[i-2] >>> 19) | (w[i-2] << 13)) ^ (w[i-2] >>> 10)
-      w[i] = (w[i-16] + s0 + w[i-7] + s1) | 0
-    }
-    var a = h0, b = h1, c = h2, d = h3, e = h4, f = h5, g = h6, hh = h7
-    for (var i = 0; i < 64; i++) {
-      var S1 = ((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7))
-      var ch = (e & f) ^ ((~e) & g); var temp1 = (hh + S1 + ch + sha256K[i] + w[i]) | 0
-      var S0 = ((a >>> 2) | (a << 30)) ^ ((a >>> 13) | (a << 19)) ^ ((a >>> 22) | (a << 10))
-      var maj = (a & b) ^ (a & c) ^ (b & c); var temp2 = (S0 + maj) | 0
-      hh = g; g = f; f = e; e = (d + temp1) | 0; d = c; c = b; b = a; a = (temp1 + temp2) | 0
-    }
-    h0 = (h0 + a) | 0; h1 = (h1 + b) | 0; h2 = (h2 + c) | 0; h3 = (h3 + d) | 0
-    h4 = (h4 + e) | 0; h5 = (h5 + f) | 0; h6 = (h6 + g) | 0; h7 = (h7 + hh) | 0
-  }
-  function hex(n) { var s = ""; for (var i = 7; i >= 0; i--) { s += ((n >>> (i*4)) & 0xF).toString(16); } return s; }
-  return hex(h0) + hex(h1) + hex(h2) + hex(h3) + hex(h4) + hex(h5) + hex(h6) + hex(h7)
+  var h0=0x6a09e667,h1=0xbb67ae85,h2=0x3c6ef372,h3=0xa54ff53a,h4=0x510e527f,h5=0x9b05688c,h6=0x1f83d9ab,h7=0x5be0cd19
+  var ml=str.length,bl=ml*8;str.push(0x80);while(str.length%64!==56)str.push(0);str.push(0,0,0,0);str.push((bl>>>24)&0xFF,(bl>>>16)&0xFF,(bl>>>8)&0xFF,bl&0xFF)
+  for(var o=0;o<str.length;o+=64){var w=new Array(64);for(var i=0;i<16;i++){var j=o+i*4;w[i]=(str[j]<<24)|(str[j+1]<<16)|(str[j+2]<<8)|str[j+3]}for(var i=16;i<64;i++){var s0=((w[i-15]>>>7)|(w[i-15]<<25))^((w[i-15]>>>18)|(w[i-15]<<14))^(w[i-15]>>>3);var s1=((w[i-2]>>>17)|(w[i-2]<<15))^((w[i-2]>>>19)|(w[i-2]<<13))^(w[i-2]>>>10);w[i]=(w[i-16]+s0+w[i-7]+s1)|0}
+  var a=h0,b=h1,c=h2,d=h3,e=h4,f=h5,g=h6,hh=h7
+  for(var i=0;i<64;i++){var S1=((e>>>6)|(e<<26))^((e>>>11)|(e<<21))^((e>>>25)|(e<<7));var ch=(e&f)^((~e)&g);var t1=(hh+S1+ch+sha256K[i]+w[i])|0;var S0=((a>>>2)|(a<<30))^((a>>>13)|(a<<19))^((a>>>22)|(a<<10));var mj=(a&b)^(a&c)^(b&c);var t2=(S0+mj)|0;hh=g;g=f;f=e;e=(d+t1)|0;d=c;c=b;b=a;a=(t1+t2)|0}
+  h0=(h0+a)|0;h1=(h1+b)|0;h2=(h2+c)|0;h3=(h3+d)|0;h4=(h4+e)|0;h5=(h5+f)|0;h6=(h6+g)|0;h7=(h7+hh)|0}
+  function hex(n){var s="";for(var i=7;i>=0;i--)s+=((n>>>(i*4))&0xF).toString(16);return s}
+  return hex(h0)+hex(h1)+hex(h2)+hex(h3)+hex(h4)+hex(h5)+hex(h6)+hex(h7)
 }
 
 // ── Paprika Format ──
@@ -668,19 +665,18 @@ function uuidString() {
 }
 
 function formatDate(d) {
-  let y = d.getFullYear(), mo = String(d.getMonth() + 1).padStart(2, "0")
-  let da = String(d.getDate()).padStart(2, "0"), h = String(d.getHours()).padStart(2, "0")
-  let mi = String(d.getMinutes()).padStart(2, "0"), s = String(d.getSeconds()).padStart(2, "0")
-  return y + "-" + mo + "-" + da + " " + h + ":" + mi + ":" + s
+  let y=d.getFullYear(),mo=String(d.getMonth()+1).padStart(2,"0"),da=String(d.getDate()).padStart(2,"0")
+  let h=String(d.getHours()).padStart(2,"0"),mi=String(d.getMinutes()).padStart(2,"0"),s=String(d.getSeconds()).padStart(2,"0")
+  return y+"-"+mo+"-"+da+" "+h+":"+mi+":"+s
 }
 
 // ── Gzip Compression (stored blocks, RFC 1952) ──
 
 function crc32(data) {
-  let table = new Uint32Array(256)
-  for (let i = 0; i < 256; i++) { let c = i; for (let j = 0; j < 8; j++) { c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1) } table[i] = c }
+  let t = new Uint32Array(256)
+  for (let i = 0; i < 256; i++) { let c = i; for (let j = 0; j < 8; j++) { c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1) } t[i] = c }
   let crc = 0xFFFFFFFF
-  for (let i = 0; i < data.length; i++) crc = table[(crc ^ data[i]) & 0xFF] ^ (crc >>> 8)
+  for (let i = 0; i < data.length; i++) crc = t[(crc ^ data[i]) & 0xFF] ^ (crc >>> 8)
   return (crc ^ 0xFFFFFFFF) >>> 0
 }
 
@@ -725,11 +721,7 @@ async function saveAndShare(gzipBytes, name) {
 // ── Alert Helper ──
 
 async function showAlert(title, message) {
-  let a = new Alert()
-  a.title = title
-  a.message = message
-  a.addAction("OK")
-  await a.present()
+  let a = new Alert(); a.title = title; a.message = message; a.addAction("OK"); await a.present()
 }
 
 // ── Entry Point ──
